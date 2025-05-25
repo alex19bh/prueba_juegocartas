@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
+import RoomDebugger from '../components/debug/RoomDebugger';
 
 const HomePage = () => {
   const { currentUser } = useAuth();
@@ -132,6 +133,14 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
+          </div>
+          
+          {/* Debug section - for development only */}
+          <div className="mt-12">
+            <details>
+              <summary className="text-lg font-bold text-gray-600 cursor-pointer mb-2">Debug Information</summary>
+              <RoomDebugger />
+            </details>
           </div>
         </div>
       </main>

@@ -23,11 +23,26 @@ const JoinRoom = () => {
       setLoading(true);
       setError('');
       
+      // Enhanced debugging
+      const storedRooms = localStorage.getItem('virus_game_rooms');
+      console.log('Current localStorage rooms:', storedRooms);
+      console.log('Available rooms in localStorage:', storedRooms ? JSON.parse(storedRooms) : 'No rooms found');
+      
+      if (storedRooms) {
+        const rooms = JSON.parse(storedRooms);
+        const inviteCodes = Object.values(rooms).map(r => r.inviteCode);
+        console.log('Available invite codes:', inviteCodes);
+        console.log('Attempting to join with code:', inviteCode.toUpperCase());
+        console.log('Code match found:', inviteCodes.includes(inviteCode.toUpperCase()));
+      }
+      
       const roomData = await joinRoom(inviteCode.toUpperCase());
+      console.log('Room joined successfully:', roomData);
       
       // Navigate to the lobby
       navigate(`/lobby/${roomData.roomId}`);
     } catch (err) {
+      console.error('Error joining room:', err);
       setError(err.message || 'Error al unirse a la sala');
     } finally {
       setLoading(false);

@@ -1,5 +1,7 @@
-// Socket service for real-time communication using mock implementation
-// In a production environment, this would connect to a real WebSocket server
+// Socket service for real-time communication with Socket.IO
+import { io } from 'socket.io-client';
+import { getAuthToken } from '../config';
+import config from '../config';
 
 class SocketService {
   constructor() {
@@ -8,25 +10,67 @@ class SocketService {
     this.authToken = null;
     this.eventListeners = {};
     
-    // Mock room data for local development
+    // For fallback to mock implementation
+    this.useMockImplementation = import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_SOCKET;
     this.mockRooms = {};
     this.mockGameStates = {};
   }
   
   // Initialize socket connection
   initialize(authToken) {
-    this.authToken = authToken;
+    this.authToken = authToken || getAuthToken();
     
-    // In a production implementation, this would connect to a real WebSocket server
-    // e.g., this.socket = io('https://api.virus-game.com', { auth: { token: authToken } });
+    if (config.useMock) {
+      // Use mock implementation for local development without backend
+      console.log('Using mock socket implementation');
+      this.connected = true;
+      
+      // Mock connection event
+      setTimeout(() => {
+        this._triggerEvent('connect', {});
+      }, 500);
+      
+      return this;
+    }
     
-    console.log('Socket initialized with auth token');
-    this.connected = true;
+    // Connect to the real Socket.IO server
+    const socketUrl = config.socketUrl;
     
-    // Mock connection event
-    setTimeout(() => {
+    // Clean up any existing connection
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+    
+    this.socket = io(socketUrl, { 
+      auth: { token: this.authToken },
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+    
+    // Handle socket connection
+    this.socket.on('connect', () => {
+      console.log('Socket connected with ID:', this.socket.id);
+      this.connected = true;
       this._triggerEvent('connect', {});
-    }, 500);
+    });
+    
+    // Handle socket disconnection
+    this.socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      this.connected = false;
+      this._triggerEvent('disconnect', { reason });
+    });
+    
+    // Handle socket error
+    this.socket.on('error', (error) => {
+      console.error('Socket error:', error);
+      this._triggerEvent('error', { message: error.message });
+    });
+    
+    // Set up event listeners for game events
+    this._setupSocketEventListeners();
     
     return this;
   }
@@ -34,7 +78,10 @@ class SocketService {
   // Disconnect from socket server
   disconnect() {
     if (this.socket) {
-      // In real implementation: this.socket.disconnect();
+      // Disconnect from the real server or cleanup mock
+      if (!config.useMock) {
+        this.socket.disconnect();
+      }
       this.socket = null;
     }
     
@@ -46,126 +93,167 @@ class SocketService {
   joinRoom(roomId) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('joinRoom', { roomId });
-    console.log(`Joining room ${roomId}`);
-    
-    // Mock room join success
-    if (!this.mockRooms[roomId]) {
-      this.mockRooms[roomId] = {
-        players: [],
-        messages: []
-      };
+    if (config.useMock) {
+      console.log(`Joining room ${roomId} (mock)`);
+      
+      // Mock room join success
+      if (!this.mockRooms[roomId]) {
+        // Check if room exists in gameService localStorage data
+        const storedRooms = localStorage.getItem('virus_game_rooms');
+        const rooms = storedRooms ? JSON.parse(storedRooms) : {};
+        
+        // Initialize the mock room with data from localStorage if available
+        this.mockRooms[roomId] = {
+          players: rooms[roomId]?.players || [],
+          messages: []
+        };
+      }
+      
+      // Mock successful room join
+      setTimeout(() => {
+        this._triggerEvent('roomJoined', { roomId });
+      }, 300);
+      
+      return;
     }
     
-    // Mock successful room join
-    setTimeout(() => {
-      this._triggerEvent('roomJoined', { roomId });
-    }, 300);
+    // Real implementation
+    console.log(`Joining room ${roomId}`);
+    this.socket.emit('joinRoom', { roomId });
   }
   
   // Leave a game room
   leaveRoom(roomId) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('leaveRoom', { roomId });
-    console.log(`Leaving room ${roomId}`);
-    
-    // Clean up mock room data
-    if (this.mockRooms[roomId]) {
-      delete this.mockRooms[roomId];
+    if (config.useMock) {
+      console.log(`Leaving room ${roomId} (mock)`);
+      
+      // Clean up mock room data
+      if (this.mockRooms[roomId]) {
+        delete this.mockRooms[roomId];
+      }
+      return;
     }
+    
+    // Real implementation
+    console.log(`Leaving room ${roomId}`);
+    this.socket.emit('leaveRoom', { roomId });
   }
   
   // Set player ready status
   setReady(roomId) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('playerReady', { roomId });
-    console.log('Player is ready');
+    if (config.useMock) {
+      console.log('Player is ready (mock)');
+      
+      // Mock all other players becoming ready after a delay
+      setTimeout(() => {
+        this._triggerEvent('allPlayersReady', { roomId });
+      }, 1500);
+      return;
+    }
     
-    // Mock all other players becoming ready after a delay
-    setTimeout(() => {
-      this._triggerEvent('allPlayersReady', { roomId });
-    }, 1500);
+    // Real implementation
+    console.log('Player is ready');
+    this.socket.emit('playerReady', { roomId });
   }
   
   // Start the game (host only)
   startGame(roomId) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('startGame', { roomId });
-    console.log('Starting game');
+    if (config.useMock) {
+      console.log('Starting game (mock)');
+      
+      // Mock game start
+      setTimeout(() => {
+        // Create mock initial game state
+        const initialGameState = this._createMockGameState(roomId);
+        this.mockGameStates[roomId] = initialGameState;
+        
+        this._triggerEvent('gameStarted', initialGameState);
+        
+        // Mock turn timer
+        this._startMockTurnTimer(roomId);
+      }, 800);
+      return;
+    }
     
-    // Mock game start
-    setTimeout(() => {
-      // Create mock initial game state
-      const initialGameState = this._createMockGameState(roomId);
-      this.mockGameStates[roomId] = initialGameState;
-      
-      this._triggerEvent('gameStarted', initialGameState);
-      
-      // Mock turn timer
-      this._startMockTurnTimer(roomId);
-    }, 800);
+    // Real implementation
+    console.log('Starting game');
+    this.socket.emit('startGame', { roomId });
   }
   
   // Play a card
   playCard(roomId, cardId, targetId, targetType) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('playCard', { roomId, cardId, targetId, targetType });
-    console.log(`Playing card ${cardId} on target ${targetId} (${targetType})`);
+    if (config.useMock) {
+      console.log(`Playing card ${cardId} on target ${targetId} (${targetType}) (mock)`);
+      
+      // Mock successful card play
+      setTimeout(() => {
+        // Update mock game state
+        if (this.mockGameStates[roomId]) {
+          const gameState = this.mockGameStates[roomId];
+          
+          // Mock removing card from hand
+          gameState.hand = gameState.hand.filter(card => card.id !== cardId);
+          
+          // Mock drawing a new card
+          const newCard = this._getRandomCard();
+          gameState.hand.push(newCard);
+          
+          // Mock changing player turn
+          const currentPlayerIndex = gameState.players.findIndex(p => p.id === gameState.currentPlayerId);
+          const nextPlayerIndex = (currentPlayerIndex + 1) % gameState.players.length;
+          gameState.currentPlayerId = gameState.players[nextPlayerIndex].id;
+          gameState.turnTimeLeft = 60;
+          
+          // Add to last action
+          gameState.lastAction = {
+            playerId: gameState.currentPlayerId,
+            action: 'playCard',
+            cardId: cardId,
+            targetId: targetId
+          };
+          
+          // Notify about game state update
+          this._triggerEvent('gameStateUpdate', gameState);
+          
+          // Notify about turn change
+          this._triggerEvent('turnChange', {
+            playerId: gameState.currentPlayerId,
+            timeLeft: gameState.turnTimeLeft
+          });
+          
+          // Reset turn timer
+          this._startMockTurnTimer(roomId);
+        }
+      }, 300);
+      return;
+    }
     
-    // Mock successful card play
-    setTimeout(() => {
-      // Update mock game state
-      if (this.mockGameStates[roomId]) {
-        const gameState = this.mockGameStates[roomId];
-        
-        // Mock removing card from hand
-        gameState.hand = gameState.hand.filter(card => card.id !== cardId);
-        
-        // Mock drawing a new card
-        const newCard = this._getRandomCard();
-        gameState.hand.push(newCard);
-        
-        // Mock changing player turn
-        const currentPlayerIndex = gameState.players.findIndex(p => p.id === gameState.currentPlayerId);
-        const nextPlayerIndex = (currentPlayerIndex + 1) % gameState.players.length;
-        gameState.currentPlayerId = gameState.players[nextPlayerIndex].id;
-        gameState.turnTimeLeft = 60;
-        
-        // Add to last action
-        gameState.lastAction = {
-          playerId: gameState.currentPlayerId,
-          action: 'playCard',
-          cardId: cardId,
-          targetId: targetId
-        };
-        
-        // Notify about game state update
-        this._triggerEvent('gameStateUpdate', gameState);
-        
-        // Notify about turn change
-        this._triggerEvent('turnChange', {
-          playerId: gameState.currentPlayerId,
-          timeLeft: gameState.turnTimeLeft
-        });
-        
-        // Reset turn timer
-        this._startMockTurnTimer(roomId);
-      }
-    }, 300);
+    // Real implementation
+    console.log(`Playing card ${cardId} on target ${targetId} (${targetType})`);
+    this.socket.emit('playCard', { roomId, cardId, targetId, targetType });
   }
   
   // Send a chat message
   sendChatMessage(roomId, message) {
     if (!this.connected) return;
     
-    // In real implementation: this.socket.emit('chatMessage', { roomId, message });
-    console.log(`Sending message to room ${roomId}: ${message}`);
+    if (config.useMock) {
+      console.log(`Sending message to room ${roomId}: ${message} (mock)`);
+      // In the mock implementation, the message will be handled by the client directly
+      return;
+    }
     
-    // In the mock implementation, the message will be handled by the client directly
+    // Real implementation
+    console.log(`Sending message to room ${roomId}: ${message}`);
+    this.socket.emit('chatMessage', { roomId, message });
   }
   
   // Register event listeners
@@ -248,6 +336,78 @@ class SocketService {
       name: `${type === 'organ' ? 'Órgano' : type === 'virus' ? 'Virus' : 'Medicina'} ${color === 'blue' ? 'Azul' : color === 'red' ? 'Rojo' : color === 'green' ? 'Verde' : 'Amarillo'}`,
       imageUrl: `/assets/images/cards/${type}-${color}.png`
     };
+  }
+  
+  // Setup socket event listeners for real-time game events
+  _setupSocketEventListeners() {
+    if (!this.socket) return;
+    
+    // Room events
+    this.socket.on('roomJoined', (data) => {
+      console.log('Room joined:', data);
+      this._triggerEvent('roomJoined', data);
+    });
+    
+    this.socket.on('roomInfo', (data) => {
+      console.log('Room info received:', data);
+      this._triggerEvent('roomInfo', data);
+    });
+    
+    this.socket.on('playerJoined', (data) => {
+      console.log('Player joined:', data);
+      this._triggerEvent('playerJoined', data);
+    });
+    
+    this.socket.on('playerLeft', (data) => {
+      console.log('Player left:', data);
+      this._triggerEvent('playerLeft', data);
+    });
+    
+    this.socket.on('playerReady', (data) => {
+      console.log('Player ready:', data);
+      this._triggerEvent('playerReady', data);
+    });
+    
+    this.socket.on('allPlayersReady', (data) => {
+      console.log('All players ready:', data);
+      this._triggerEvent('allPlayersReady', data);
+    });
+    
+    // Game events
+    this.socket.on('gameStarted', (data) => {
+      console.log('Game started:', data);
+      this._triggerEvent('gameStarted', data);
+    });
+    
+    this.socket.on('gameStateUpdate', (data) => {
+      console.log('Game state updated');
+      this._triggerEvent('gameStateUpdate', data);
+    });
+    
+    this.socket.on('turnChange', (data) => {
+      console.log('Turn changed:', data);
+      this._triggerEvent('turnChange', data);
+    });
+    
+    this.socket.on('timerUpdate', (data) => {
+      this._triggerEvent('timerUpdate', data);
+    });
+    
+    this.socket.on('cardPlayed', (data) => {
+      console.log('Card played:', data);
+      this._triggerEvent('cardPlayed', data);
+    });
+    
+    this.socket.on('gameOver', (data) => {
+      console.log('Game over:', data);
+      this._triggerEvent('gameOver', data);
+    });
+    
+    // Chat events
+    this.socket.on('chatMessage', (data) => {
+      console.log('Chat message received');
+      this._triggerEvent('chatMessage', data);
+    });
   }
   
   // Mock turn timer logic
