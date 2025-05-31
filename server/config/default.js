@@ -4,7 +4,7 @@ require('dotenv').config();
 // General configuration values
 module.exports = {
   // Server configuration
-  port: process.env.PORT || 5000,
+  port: process.env.PORT || 8000,
   env: process.env.NODE_ENV || 'development',
   
   // Client URL for CORS

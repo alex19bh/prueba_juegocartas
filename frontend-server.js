@@ -4,7 +4,7 @@ const path = require('path');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Define the path to the built React app
 const distPath = path.join(__dirname, 'dist');
@@ -14,13 +14,13 @@ app.use(express.static(distPath));
 
 // Set up proxy middleware for API requests
 app.use('/api', createProxyMiddleware({
-  target: 'http://localhost:5000',
+  target: 'http://194.164.162.146:8000',
   changeOrigin: true
 }));
 
 // Set up proxy middleware for Socket.IO
 app.use('/socket.io', createProxyMiddleware({
-  target: 'http://localhost:5000',
+  target: 'http://194.164.162.146:8000',
   changeOrigin: true,
   ws: true
 }));

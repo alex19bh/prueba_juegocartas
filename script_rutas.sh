@@ -1,3 +1,5 @@
+# Crea un script de corrección completa
+cat > /webs/juego/scripts/complete-fix.sh << 'EOL'
 #!/bin/bash
 echo "=== Script de Corrección Completa para El Virus Game ===" 
 echo "Este script corregirá todos los problemas de importación conocidos en la aplicación."
@@ -45,7 +47,7 @@ cat > /webs/juego/server/config/index.js << 'EOLCONFIG'
 module.exports = {
   JWT_SECRET: process.env.JWT_SECRET || 'el_virus_jwt_secret_key',
   DB_PATH: process.env.DB_PATH || './db/game.db',
-  PORT: process.env.PORT || 5000
+  PORT: process.env.PORT || 8000
 };
 EOLCONFIG
 
@@ -79,3 +81,10 @@ pm2 start server/server.js --name=el-virus
 echo "=== Corrección Completa Finalizada ==="
 echo "Tu servidor debería iniciar ahora sin errores de importación."
 echo "Accede a la aplicación en: http://localhost:8000"
+EOL
+
+# Hacerlo ejecutable
+chmod +x /webs/juego/scripts/complete-fix.sh
+
+# Ejecutar el script de corrección
+/webs/juego/scripts/complete-fix.sh

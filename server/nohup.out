@@ -1,0 +1,16 @@
+
+> el-virus-game@1.0.0 dev
+> vite
+
+
+  VITE v4.5.14  ready in 2817 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+Failed to load url /dist/assets/index-c7ba31d6.js (resolved id: /dist/assets/index-c7ba31d6.js). Does the file exist?
+Failed to load url /dist/assets/index-c7ba31d6.js (resolved id: /dist/assets/index-c7ba31d6.js). Does the file exist?
+02:10:38 [vite] server/.env changed, restarting server...
+02:10:38 [vite] server restarted.
+02:11:53 [vite] page reload index.html
+02:12:10 [vite] page reload index.html
+02:12:42 [vite] page reload dist/index.html

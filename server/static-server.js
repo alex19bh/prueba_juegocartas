@@ -5,7 +5,7 @@ const http = require('http');
 
 // Create Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 
 // Basic middleware
 app.use(express.json());

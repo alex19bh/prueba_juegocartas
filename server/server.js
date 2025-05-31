@@ -16,10 +16,16 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+//app.use(cors({
+//  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+//  credentials: true
+//}));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://194.164.162.146:5000'],
   credentials: true
 }));
+
+
 
 // API routes
 app.use('/api/auth', authRoutes);
@@ -44,13 +50,21 @@ app.use((req, res) => {
 const server = http.createServer(app);
 
 // Set up Socket.IO
+//const io = socketIO(server, {
+//  cors: {
+//    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+//    methods: ['GET', 'POST'],
+//    credentials: true
+//  }
+//});
 const io = socketIO(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'http://194.164.162.146:5000'],
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
+
 
 // Initialize socket manager
 socketManager.initSocketManager(io);
